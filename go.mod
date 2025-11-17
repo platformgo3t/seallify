@@ -1,8 +1,6 @@
 module github.com/platformgo3t/seallify
 
-go 1.24.0
-
-toolchain go1.24.10
+go 1.24.10
 
 require github.com/denisbrodbeck/machineid v1.0.1
 

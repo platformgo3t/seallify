@@ -17,24 +17,20 @@ import (
 	"github.com/denisbrodbeck/machineid"
 )
 
-// StorageFile define el nombre del archivo de persistencia local (cifrado)
 const StorageFile = "license.dat"
 
-// --- ESTRUCTURAS DE DATOS EXPORTADAS Y CONFIGURABLES ---
-
-// Config contiene todos los parámetros que el consumidor de la librería debe proveer.
+// Config It contains all the parameters that the library consumer must provide.
 type Config struct {
 	ApiActivateURL string
 	ApiValidateURL string
-	// EncryptionKey: Clave de 32 bytes para AES-256 (MANDATORIA)
+	// EncryptionKey: 32-byte key for AES-256 (MANDATORY)
 	EncryptionKey []byte
-	// ValidationInterval: Frecuencia con la que se hace el chequeo (heartbeat) al servidor.
+	// ValidationInterval: Frequency with which the server is checked (heartbeat).
 	ValidationInterval time.Duration
-	// AppID: Identificador único de la aplicación para generar el Machine ID.
+	// AppID: Unique application identifier to generate the Machine ID.
 	AppID string
 }
 
-// LicenseManager gestiona el estado de la licencia y el almacenamiento seguro.
 type LicenseManager struct {
 	Config         Config
 	CurrentToken   string
@@ -45,7 +41,6 @@ type LicenseManager struct {
 	AllowedModules []string
 }
 
-// EncryptedLicenseData es la estructura que se almacena en el archivo (cifrada).
 type EncryptedLicenseData struct {
 	Token          string    `json:"token"`
 	LicenseKey     string    `json:"license_key"`
@@ -53,21 +48,18 @@ type EncryptedLicenseData struct {
 	AllowedModules []string  `json:"allowed_modules"`
 }
 
-// ClientLicenseRequest estructura para enviar al servidor.
 type ClientLicenseRequest struct {
 	LicenseKey string `json:"license_key"`
 	MachineID  string `json:"machine_id"`
 }
 
-// ClientLicenseResponse es la respuesta del servidor.
 type ClientLicenseResponse struct {
 	Token     string `json:"token"`
 	ExpiresAt string `json:"expires_at"`
 	Status    string `json:"status"`
-	Modules   string `json:"modules"` // El servidor envía los módulos como una cadena JSON
+	Modules   string `json:"modules"`
 }
 
-// NetworkError se usa para distinguir fallos de conexión de rechazos del servidor.
 type NetworkError struct {
 	msg string
 }
@@ -76,14 +68,12 @@ func (e *NetworkError) Error() string {
 	return e.msg
 }
 
-// --- FUNCIONES DE UTILIDAD INTERNAS (PRIVADAS) ---
-
-// getMachineID genera y retorna un ID de máquina único, usando el AppID de la configuración.
+// getMachineID generates and returns a unique machine ID, using the AppID from the configuration.
 func (mgr *LicenseManager) getMachineID() (string, error) {
 	return machineid.ProtectedID(mgr.Config.AppID)
 }
 
-// encrypt cifra los datos con AES-GCM.
+// Encrypt encrypts the data using AES-GCM
 func Encrypt(plaintext []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -104,7 +94,7 @@ func Encrypt(plaintext []byte, key []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-// decrypt descifra los datos con AES-GCM.
+// Decrypt the data using AES-GCM.
 func Decrypt(ciphertext []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -118,7 +108,7 @@ func Decrypt(ciphertext []byte, key []byte) ([]byte, error) {
 
 	nonceSize := gcm.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, fmt.Errorf("texto cifrado demasiado corto")
+		return nil, fmt.Errorf("ciphertext too short")
 	}
 
 	nonce, encryptedData := ciphertext[:nonceSize], ciphertext[nonceSize:]
@@ -131,7 +121,7 @@ func Decrypt(ciphertext []byte, key []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// saveLicenseData cifra y guarda la clave, el token, los módulos y la expiración en un archivo local.
+// saveLicenseData encrypts and saves the key, token, modules, and expiration to a local file.
 func (mgr *LicenseManager) saveLicenseData() error {
 	dataToSave := EncryptedLicenseData{
 		Token:          mgr.CurrentToken,
@@ -142,45 +132,45 @@ func (mgr *LicenseManager) saveLicenseData() error {
 
 	jsonData, err := json.Marshal(dataToSave)
 	if err != nil {
-		return fmt.Errorf("error al serializar JSON: %w", err)
+		return fmt.Errorf("Error serializing JSON: %w", err)
 	}
 
 	encryptedBytes, err := Encrypt(jsonData, mgr.Config.EncryptionKey)
 	if err != nil {
-		return fmt.Errorf("error al cifrar datos: %w", err)
+		return fmt.Errorf("Error encrypting data: %w", err)
 	}
 
 	encodedData := base64.StdEncoding.EncodeToString(encryptedBytes)
 
 	err = os.WriteFile(StorageFile, []byte(encodedData), 0600)
 	if err != nil {
-		return fmt.Errorf("error al escribir archivo de licencia: %w", err)
+		return fmt.Errorf("Error writing license file: %w", err)
 	}
 
-	log.Println("🔑 Datos de licencia cifrados y guardados en", StorageFile)
+	log.Println("🔑 License data encrypted and stored in", StorageFile)
 	return nil
 }
 
-// loadLicenseData carga y descifra la clave, el token, los módulos y la expiración desde el archivo local.
+// loadLicenseData loads and decrypts the key, token, modules, and expiration from the local file.
 func (mgr *LicenseManager) loadLicenseData() error {
 	content, err := os.ReadFile(StorageFile)
 	if err != nil {
-		return fmt.Errorf("archivo de licencia no encontrado o inaccesible: %w", err)
+		return fmt.Errorf("license file not found or inaccessible: %w", err)
 	}
 
 	encryptedBytes, err := base64.StdEncoding.DecodeString(string(content))
 	if err != nil {
-		return fmt.Errorf("error al decodificar Base64: %w", err)
+		return fmt.Errorf("Base64 decoding error: %w", err)
 	}
 
 	decryptedBytes, err := Decrypt(encryptedBytes, mgr.Config.EncryptionKey)
 	if err != nil {
-		return fmt.Errorf("error al descifrar datos (clave o archivo corrupto): %w", err)
+		return fmt.Errorf("Error decrypting data (corrupted key or file): %w", err)
 	}
 
 	var loadedData EncryptedLicenseData
 	if err := json.Unmarshal(decryptedBytes, &loadedData); err != nil {
-		return fmt.Errorf("error al deserializar JSON: %w", err)
+		return fmt.Errorf("Error deserializing JSON: %w", err)
 	}
 
 	// Cargar los datos en el manager
@@ -189,39 +179,36 @@ func (mgr *LicenseManager) loadLicenseData() error {
 	mgr.ExpiresAt = loadedData.ExpiresAt
 	mgr.AllowedModules = loadedData.AllowedModules
 
-	log.Println("🔑 Datos de licencia cargados con éxito desde", StorageFile)
+	log.Println("🔑 License data successfully uploaded from", StorageFile)
 	return nil
 }
 
-// parseAndSetModules toma la respuesta del servidor y actualiza los módulos del manager.
 func (mgr *LicenseManager) parseAndSetModules(modulesJSON string) {
 	var modules []string
 	if err := json.Unmarshal([]byte(modulesJSON), &modules); err != nil {
-		log.Printf("Advertencia: Falló la deserialización de módulos JSON: %v", err)
+		log.Printf("Warning: JSON module deserialization failed: %v", err)
 		mgr.AllowedModules = []string{"error"} // Default
 	} else {
 		mgr.AllowedModules = modules
 	}
 }
 
-// parseAndSetExpiration toma la respuesta del servidor y actualiza la fecha de expiración.
 func (mgr *LicenseManager) parseAndSetExpiration(expiresAtStr string) {
 	t, err := time.Parse(time.RFC3339, expiresAtStr)
 	if err != nil {
-		log.Printf("Advertencia: Falló el parseo de la fecha de expiración: %v", err)
+		log.Printf("Warning: Expiration date parsing failed: %v", err)
 		mgr.ExpiresAt = time.Time{}
 	} else {
 		mgr.ExpiresAt = t
 	}
 }
 
-// validateToken realiza el chequeo periódico (Heartbeat) con el servidor.
+// validateToken performs periodic checks (Heartbeat) with the server.
 func (mgr *LicenseManager) validateToken() error {
-	log.Println("--- INICIANDO CHECK-IN DE LICENCIA ---")
-
+	log.Println("--- STARTING LICENSE CHECK-IN ---")
 	if mgr.CurrentToken == "" {
 		mgr.IsValid = false
-		return fmt.Errorf("no hay token guardado. Fallo del sistema de persistencia")
+		return fmt.Errorf("No token saved. Persistence system failure")
 	}
 
 	req, err := http.NewRequest("POST", mgr.Config.ApiValidateURL, nil)
@@ -237,7 +224,7 @@ func (mgr *LicenseManager) validateToken() error {
 
 	if err != nil {
 		mgr.IsValid = false
-		// Retorna NetworkError para activar el período de gracia
+		// Return NetworkError to activate the grace period
 		return &NetworkError{msg: fmt.Sprintf("error de red al validar: %v", err)}
 	}
 	defer resp.Body.Close()
@@ -246,7 +233,7 @@ func (mgr *LicenseManager) validateToken() error {
 		mgr.IsValid = false
 		var errorMsg bytes.Buffer
 		errorMsg.ReadFrom(resp.Body)
-		// Retorna error de servidor (no se aplica período de gracia)
+		// Returns server error (no grace period applies)
 		return fmt.Errorf("validación fallida (HTTP %d): %s", resp.StatusCode, errorMsg.String())
 	}
 
@@ -256,22 +243,21 @@ func (mgr *LicenseManager) validateToken() error {
 		return fmt.Errorf("error al decodificar la respuesta de validación: %w", err)
 	}
 
-	// El servidor responde OK: SU ESTADO PREVALECE, actualizamos la expiración y validamos.
+	// The server responds OK: YOUR STATE PREVAILS, we update the expiration and validate.
 	mgr.parseAndSetExpiration(response.ExpiresAt)
 	mgr.parseAndSetModules(response.Modules)
 
 	mgr.CurrentToken = response.Token
 	mgr.IsValid = true
-	log.Println("✅ Check-in exitoso. Token renovado. Continuar uso.")
+	log.Println("✅ Check-in successful. Token renewed. Continue using.")
 
-	// Guardar el nuevo token, clave, expiración y módulos cifrados
 	if err := mgr.saveLicenseData(); err != nil {
-		log.Printf("Advertencia: No se pudo guardar el archivo de licencia cifrado después de la renovación: %v", err)
+		log.Printf("Warning: The encrypted license file could not be saved after renewal: %v", err)
 	}
 	return nil
 }
 
-// startValidationLoop inicia el chequeo periódico de licencia en segundo plano.
+// startValidationLoop -- Start periodic license checks in the background.
 func (mgr *LicenseManager) startValidationLoop() {
 	ticker := time.NewTicker(mgr.Config.ValidationInterval)
 	defer ticker.Stop()
@@ -279,78 +265,68 @@ func (mgr *LicenseManager) startValidationLoop() {
 	for range ticker.C {
 		err := mgr.validateToken()
 		if err != nil {
-			log.Printf("⛔ ERROR DE LICENCIA PERIÓDICO: %v", err)
+			log.Printf("⛔ NEWSPAPER LICENSE ERROR: %v", err)
 			mgr.IsValid = false
 
 			if _, isNetError := err.(*NetworkError); isNetError {
-				// LÓGICA DEL PERÍODO DE GRACIA EN SEGUNDO PLANO
+				// LOGIC OF THE GRACE PERIOD IN THE BACKGROUND
 				if time.Now().Before(mgr.ExpiresAt) {
-					log.Println("⚠️ Manteniendo activo con período de gracia (FALLO DE RED).")
+					log.Println("⚠️ Maintaining active with a grace period (NETWORK FAILURE).")
 					mgr.IsValid = true
 				} else {
-					log.Println("🚨 PERÍODO DE GRACIA EXPIRADO. Bloqueando funcionalidad.")
+					log.Println("🚨 GRACE PERIOD EXPIRED. Blocking functionality.")
 					mgr.IsValid = false
 				}
 			} else {
-				// El error NO es de red, sino de RECHAZO DEL SERVIDOR (bloqueo inmediato)
-				log.Println("🚨 RECHAZO DEL SERVIDOR. Bloqueando funcionalidad inmediatamente.")
+				log.Println("🚨 SERVER REJECTION. Immediately blocking functionality.")
 				mgr.IsValid = false
 			}
 		}
 	}
 }
 
-// --- MÉTODOS EXPORTADOS PARA EL CONSUMIDOR ---
-
-// NewManager crea e inicializa una nueva instancia de LicenseManager.
 func NewManager(cfg Config) (*LicenseManager, error) {
 	mgr := &LicenseManager{
 		Config: cfg,
 	}
 
-	// 1. Obtener Machine ID
 	var err error
 	mgr.MachineID, err = mgr.getMachineID()
 	if err != nil {
-		return nil, fmt.Errorf("error al obtener Machine ID: %w", err)
+		return nil, fmt.Errorf("Error obtaining Machine ID: %w", err)
 	}
 
-	// 2. Intentar cargar datos guardados
 	loadErr := mgr.loadLicenseData()
 	if loadErr != nil {
-		log.Printf("INFO: No se pudo cargar la licencia cifrada. Se requiere activación inicial: %v", loadErr)
-		// Dejar mgr.CurrentToken vacío, lo que fuerza la activación
+		log.Printf("INFO:The encrypted license could not be loaded. Initial activation is required.: %v", loadErr)
+		// Leaving mgr.CurrentToken empty forces activation
 	} else {
-		// 3. Si cargó, intentar la validación inicial (heartbeat)
-		log.Println("Licencia cargada. Intentando validar token...")
+		log.Println("License loaded. Attempting to validate token...")
 		validationErr := mgr.validateToken()
 
 		if validationErr != nil {
-			log.Printf("⛔ VALIDACIÓN FALLIDA: %v", validationErr)
+			log.Printf("⛔ VALIDATION FAILED: %v", validationErr)
 
 			if _, isNetError := validationErr.(*NetworkError); isNetError {
 				// Período de gracia si hay error de red
 				if time.Now().Before(mgr.ExpiresAt) {
 					mgr.IsValid = true
-					log.Println("⚠️ Usando período de gracia local (FALLO DE RED).")
+					log.Println("⚠️ Using local grace period (NETWORK FAILURE).")
 				} else {
-					return nil, fmt.Errorf("token expirado localmente y fallo de conexión: la aplicación no puede iniciar")
+					return nil, fmt.Errorf("Locally expired token and connection failure: the application with limited options.")
 				}
 			} else {
-				// Rechazo del servidor (bloqueo total)
-				return nil, fmt.Errorf("rechazo de validación por el servidor: %w", validationErr)
+				return nil, fmt.Errorf("server validation rejection: %w", validationErr)
 			}
 		}
 	}
 
-	// 4. Iniciar el chequeo periódico en segundo plano
+	// Start periodic background checks
 	go mgr.startValidationLoop()
 
 	return mgr, nil
 }
 
-// Activate intenta la activación inicial o reactivación con una clave de licencia.
-// Se usa si NewManager falla o si el token está vacío.
 func (mgr *LicenseManager) Activate(licenseKey string) error {
 	mgr.LicenseKey = licenseKey
 
@@ -359,19 +335,19 @@ func (mgr *LicenseManager) Activate(licenseKey string) error {
 
 	resp, err := http.Post(mgr.Config.ApiActivateURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return fmt.Errorf("error de conexión con el servidor de licencias: %w", err)
+		return fmt.Errorf("Connection error with the license server: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		var errorMsg bytes.Buffer
 		errorMsg.ReadFrom(resp.Body)
-		return fmt.Errorf("activación fallida (HTTP %d): %s", resp.StatusCode, errorMsg.String())
+		return fmt.Errorf("activation failed (HTTP %d): %s", resp.StatusCode, errorMsg.String())
 	}
 
 	var response ClientLicenseResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return fmt.Errorf("error al decodificar respuesta de activación: %w", err)
+		return fmt.Errorf("error decoding activation response: %w", err)
 	}
 
 	mgr.parseAndSetExpiration(response.ExpiresAt)
@@ -379,16 +355,14 @@ func (mgr *LicenseManager) Activate(licenseKey string) error {
 
 	mgr.CurrentToken = response.Token
 	mgr.IsValid = true
-	log.Println("✅ Licencia activada con éxito. Token obtenido y módulos actualizados.")
+	log.Println("✅ License successfully activated. Token obtained and modules updated..")
 
-	// Guardar la licencia recién activada
 	if err := mgr.saveLicenseData(); err != nil {
-		log.Printf("Advertencia: No se pudo guardar el archivo de licencia cifrado: %v", err)
+		log.Printf("Warning: The encrypted license file could not be saved.: %v", err)
 	}
 	return nil
 }
 
-// CheckModule es la función clave que el consumidor usará para verificar permisos.
 func (mgr *LicenseManager) CheckModule(moduleName string) bool {
 	if !mgr.IsValid {
 		return false
@@ -401,7 +375,6 @@ func (mgr *LicenseManager) CheckModule(moduleName string) bool {
 	return false
 }
 
-// GetStatus retorna si la licencia es válida o no.
 func (mgr *LicenseManager) GetStatus() bool {
 	return mgr.IsValid
 }

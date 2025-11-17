@@ -43,7 +43,7 @@ import (
 	"strings"
 	"time"
 
-	"[github.com/platformgo3t/seallify/licensingclient](https://github.com/platformgo3t/seallify/licensingclient)"
+	"github.com/platformgo3t/seallify/licensingclient"
 )
 
 // Constantes de API

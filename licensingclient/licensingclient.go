@@ -84,7 +84,7 @@ func (mgr *LicenseManager) getMachineID() (string, error) {
 }
 
 // encrypt cifra los datos con AES-GCM.
-func encrypt(plaintext []byte, key []byte) ([]byte, error) {
+func Encrypt(plaintext []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func encrypt(plaintext []byte, key []byte) ([]byte, error) {
 }
 
 // decrypt descifra los datos con AES-GCM.
-func decrypt(ciphertext []byte, key []byte) ([]byte, error) {
+func Decrypt(ciphertext []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func (mgr *LicenseManager) saveLicenseData() error {
 		return fmt.Errorf("error al serializar JSON: %w", err)
 	}
 
-	encryptedBytes, err := encrypt(jsonData, mgr.Config.EncryptionKey)
+	encryptedBytes, err := Encrypt(jsonData, mgr.Config.EncryptionKey)
 	if err != nil {
 		return fmt.Errorf("error al cifrar datos: %w", err)
 	}
@@ -173,7 +173,7 @@ func (mgr *LicenseManager) loadLicenseData() error {
 		return fmt.Errorf("error al decodificar Base64: %w", err)
 	}
 
-	decryptedBytes, err := decrypt(encryptedBytes, mgr.Config.EncryptionKey)
+	decryptedBytes, err := Decrypt(encryptedBytes, mgr.Config.EncryptionKey)
 	if err != nil {
 		return fmt.Errorf("error al descifrar datos (clave o archivo corrupto): %w", err)
 	}

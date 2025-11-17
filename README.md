@@ -61,11 +61,11 @@ func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	config := licensingclient.Config{
-		ApiActivateURL:     API_ACTIVATE_URL,
-		ApiValidateURL:     API_VALIDATE_URL,
-		EncryptionKey:      EncryptionKey,
+		ApiActivateURL:     API_ACTIVATE_URL,
+		ApiValidateURL:     API_VALIDATE_URL,
+		EncryptionKey:      EncryptionKey,
 		ValidationInterval: ValidationInterval,
-		AppID:              AppID,
+		AppID:              AppID,
 	}
 
 	// 1. Crear e inicializar el LicenseManager (Intenta cargar y validar en background)
@@ -80,7 +80,7 @@ func main() {
 	// Si el token sigue vacío después de la inicialización (caso de licencia.dat faltante)
 	// o si el manager es nulo (caso de MachineID fail), forzamos la activación.
 	// La comprobación !mgr.GetStatus() evita que el bucle principal se ejecute
-    // si el servidor rechazó el token existente.
+	// si el servidor rechazó el token existente.
 	if mgr == nil || mgr.CurrentToken == "" || !mgr.GetStatus() {
 
 		// Asegurarse de tener un manager si NewManager falló por alguna razón

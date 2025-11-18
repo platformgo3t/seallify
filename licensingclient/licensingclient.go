@@ -216,8 +216,13 @@ func (mgr *LicenseManager) validateToken() error {
 		mgr.IsValid = false
 		return err
 	}
-
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Printf("Advertencia: No se pudo obtener el nombre del host: %v", err)
+		hostname = "unknown-host"
+	}
 	req.Header.Add("Authorization", "Bearer "+mgr.CurrentToken)
+	req.Header.Add("X-Host-Name", hostname)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)

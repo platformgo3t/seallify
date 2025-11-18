@@ -284,6 +284,14 @@ func (mgr *LicenseManager) startValidationLoop() {
 				}
 			} else {
 				log.Println("🚨 SERVER REJECTION. Immediately blocking functionality.")
+				if removeErr := os.Remove(StorageFile); removeErr != nil {
+					// Si el archivo no existe, os.Remove devuelve un error, pero lo ignoramos si es "no existe".
+					if !os.IsNotExist(removeErr) {
+						log.Printf("Warning: License file cleanup failed: %v", removeErr)
+					}
+				} else {
+					log.Println("✅ Obsolete or corrupt license file (license.dat) successfully removed.")
+				}
 				mgr.IsValid = false
 			}
 		}

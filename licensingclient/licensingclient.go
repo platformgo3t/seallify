@@ -17,8 +17,6 @@ import (
 	"github.com/denisbrodbeck/machineid"
 )
 
-const StorageFile = "license.dat"
-
 // Config It contains all the parameters that the library consumer must provide.
 type Config struct {
 	ApiActivateURL string
@@ -28,7 +26,8 @@ type Config struct {
 	// ValidationInterval: Frequency with which the server is checked (heartbeat).
 	ValidationInterval time.Duration
 	// AppID: Unique application identifier to generate the Machine ID.
-	AppID string
+	AppID       string
+	StorageFile string
 }
 
 type LicenseManager struct {
@@ -142,18 +141,18 @@ func (mgr *LicenseManager) saveLicenseData() error {
 
 	encodedData := base64.StdEncoding.EncodeToString(encryptedBytes)
 
-	err = os.WriteFile(StorageFile, []byte(encodedData), 0600)
+	err = os.WriteFile(mgr.Config.StorageFile, []byte(encodedData), 0600)
 	if err != nil {
 		return fmt.Errorf("Error writing license file: %w", err)
 	}
 
-	log.Println("🔑 License data encrypted and stored in", StorageFile)
+	log.Println("🔑 License data encrypted and stored in", mgr.Config.StorageFile)
 	return nil
 }
 
 // loadLicenseData loads and decrypts the key, token, modules, and expiration from the local file.
 func (mgr *LicenseManager) loadLicenseData() error {
-	content, err := os.ReadFile(StorageFile)
+	content, err := os.ReadFile(mgr.Config.StorageFile)
 	if err != nil {
 		return fmt.Errorf("license file not found or inaccessible: %w", err)
 	}
@@ -179,7 +178,7 @@ func (mgr *LicenseManager) loadLicenseData() error {
 	mgr.ExpiresAt = loadedData.ExpiresAt
 	mgr.AllowedModules = loadedData.AllowedModules
 
-	log.Println("🔑 License data successfully uploaded from", StorageFile)
+	log.Println("🔑 License data successfully uploaded from", mgr.Config.StorageFile)
 	return nil
 }
 
@@ -284,7 +283,7 @@ func (mgr *LicenseManager) startValidationLoop() {
 				}
 			} else {
 				log.Println("🚨 SERVER REJECTION. Immediately blocking functionality.")
-				if removeErr := os.Remove(StorageFile); removeErr != nil {
+				if removeErr := os.Remove(mgr.Config.StorageFile); removeErr != nil {
 					// Si el archivo no existe, os.Remove devuelve un error, pero lo ignoramos si es "no existe".
 					if !os.IsNotExist(removeErr) {
 						log.Printf("Warning: License file cleanup failed: %v", removeErr)
